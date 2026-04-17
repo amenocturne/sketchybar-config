@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+# Minimal sketchybar for AeroSpace — workspace indicators with app icons
+# Each workspace is a bracket of: [number] [slot0] [slot1] [slot2]
+
+PLUGIN_DIR="$HOME/.config/sketchybar/plugins"
+
+# ----- BAR -----
+sketchybar --bar \
+    height=26 \
+    blur_radius=20 \
+    position=top \
+    padding_left=12 \
+    padding_right=16 \
+    color=0x881d1d20 \
+    corner_radius=8 \
+    y_offset=4 \
+    margin=0 \
+    notch_width=250 \
+    topmost=off
+
+# ----- DEFAULTS -----
+sketchybar --default \
+    updates=when_shown \
+    icon.font="FiraCode Nerd Font:Bold:12.0" \
+    label.font="sketchybar-app-font:Regular:14.0" \
+    icon.color=0xffe5e5e5 \
+    label.color=0xffe5e5e5 \
+    padding_left=3 \
+    padding_right=3
+
+# ----- EVENTS -----
+sketchybar --add event aerospace_workspace_change
+sketchybar --add event aerospace_overview_toggle
+sketchybar --add event layout_changed
+
+# ----- WORKSPACE ITEMS (centered) -----
+for sid in 1 2 3 4 5 6 7 8 9 10; do
+    # Workspace number (drives the script that updates this workspace's state)
+    sketchybar --add item space.$sid left \
+        --subscribe space.$sid aerospace_workspace_change \
+        --set space.$sid \
+            icon="$sid" \
+            icon.padding_left=10 \
+            icon.padding_right=6 \
+            label.drawing=off \
+            padding_left=0 \
+            padding_right=0 \
+            click_script="sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$sid & /opt/homebrew/bin/aerospace workspace $sid" \
+            script="$PLUGIN_DIR/aerospace.sh $sid"
+
+    # Two icon slots — fixed width each, invisible when empty
+    for slot in 0 1; do
+        sketchybar --add item space.$sid.s$slot left \
+            --set space.$sid.s$slot \
+                width=16 \
+                icon.drawing=off \
+                label="" \
+                label.align=center \
+                label.padding_left=0 \
+                label.padding_right=0 \
+                padding_left=0 \
+                padding_right=0 \
+                click_script="/opt/homebrew/bin/aerospace workspace $sid"
+    done
+
+    # Right-side padding inside the pill (matches left icon.padding_left)
+    sketchybar --add item space.$sid.pad left \
+        --set space.$sid.pad \
+            width=4 \
+            icon.drawing=off \
+            label.drawing=off \
+            padding_left=0 \
+            padding_right=0
+
+    # Bracket groups all items under a shared background
+    sketchybar --add bracket space.$sid.bracket \
+        space.$sid space.$sid.s0 space.$sid.s1 space.$sid.pad \
+        --set space.$sid.bracket \
+            background.color=0x00000000 \
+            background.corner_radius=5 \
+            background.height=20 \
+            background.drawing=off
+
+    # Separator between workspaces (except after last)
+    if [ "$sid" != "10" ]; then
+        sketchybar --add item space.sep.$sid left \
+            --set space.sep.$sid \
+                icon="▎" \
+                icon.color=0xff606060 \
+                icon.font="FiraCode Nerd Font:Bold:18.0" \
+                icon.padding_left=0 \
+                icon.padding_right=0 \
+                label.drawing=off \
+                padding_left=3 \
+                padding_right=3
+    fi
+done
+
+# ----- RIGHT: order L→R after setup: keyboard | battery | clock -----
+# First-added = rightmost; last-added = leftmost
+sketchybar --add item clock right \
+    --set clock \
+        update_freq=10 \
+        icon="" \
+        icon.font="FiraCode Nerd Font:Bold:13.0" \
+        icon.padding_right=6 \
+        label.font="FiraCode Nerd Font:Semibold:12.0" \
+        script="$PLUGIN_DIR/clock.sh"
+
+sketchybar --add item battery right \
+    --set battery \
+        update_freq=60 \
+        icon.font="FiraCode Nerd Font:Semibold:12.0" \
+        icon.padding_right=4 \
+        label.font="FiraCode Nerd Font:Bold:15.0" \
+        label.padding_right=2 \
+        script="$PLUGIN_DIR/battery.sh" \
+    --subscribe battery system_woke power_source_change
+
+sketchybar --add item keyboard right \
+    --subscribe keyboard layout_changed \
+    --set keyboard \
+        update_freq=1 \
+        icon.font="FiraCode Nerd Font:Bold:11.0" \
+        icon.padding_right=4 \
+        label.font="FiraCode Nerd Font:Bold:13.0" \
+        label.padding_right=2 \
+        script="$PLUGIN_DIR/keyboard.sh"
+
+# ----- OVERVIEW POPUP ANCHOR (hidden, triggered by BTT) -----
+sketchybar --add item overview_anchor center \
+    --subscribe overview_anchor aerospace_overview_toggle \
+    --set overview_anchor \
+        drawing=off \
+        popup.align=center \
+        popup.background.color=0xee1e1e2e \
+        popup.background.corner_radius=8 \
+        popup.background.border_color=0xffff5257 \
+        popup.background.border_width=1 \
+        script="$PLUGIN_DIR/overview.sh"
+
+# Force initial workspace highlight
+sketchybar --trigger aerospace_workspace_change \
+    FOCUSED_WORKSPACE=$(aerospace list-workspaces --focused)
+
+sketchybar --update
+
+echo "sketchybar config loaded."
