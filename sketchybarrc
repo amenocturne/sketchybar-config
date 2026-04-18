@@ -33,14 +33,17 @@ sketchybar --default \
 sketchybar --add event aerospace_workspace_change
 sketchybar --add event aerospace_overview_toggle
 sketchybar --add event layout_changed
+sketchybar --add event aerospace_history_change
 
 # ----- WORKSPACE ITEMS (centered) -----
 for sid in 1 2 3 4 5 6 7 8 9 10; do
+    # Workspace 10 is labeled "0" to match its keyboard binding (alt-ctrl-cmd-0).
+    [ "$sid" = "10" ] && sid_label="0" || sid_label="$sid"
     # Workspace number (drives the script that updates this workspace's state)
     sketchybar --add item space.$sid left \
         --subscribe space.$sid aerospace_workspace_change \
         --set space.$sid \
-            icon="$sid" \
+            icon="$sid_label" \
             icon.padding_left=10 \
             icon.padding_right=6 \
             label.drawing=off \
@@ -127,6 +130,45 @@ sketchybar --add item keyboard right \
         label.font="FiraCode Nerd Font:Bold:13.0" \
         label.padding_right=2 \
         script="$PLUGIN_DIR/keyboard.sh"
+
+# ----- SPACER between history queue and keyboard widget -----
+# Added after keyboard, before history items → sits directly left of keyboard.
+sketchybar --add item history_spacer right \
+    --set history_spacer \
+        width=80 \
+        label.drawing=off \
+        icon.drawing=off \
+        background.drawing=off
+
+# ----- HISTORY QUEUE (fixed 10 slots) -----
+# Slot 0 = oldest, slot 9 = most recent. Layout: oldest on left, newest on right
+# (closest to spacer) — queue fills L→R as you make jumps. Add 9 first so it
+# sits rightmost; slot 0 last → leftmost.
+# Slots are pure visuals; the invisible `history_controller` item owns
+# the subscription and updates all 10 slots in one plugin run.
+for i in 9 8 7 6 5 4 3 2 1 0; do
+    sketchybar --add item history.$i right \
+        --set history.$i \
+            width=26 \
+            label="*" \
+            label.font="FiraCode Nerd Font:Bold:13.0" \
+            label.color=0xff505050 \
+            label.align=center \
+            label.padding_left=0 \
+            label.padding_right=0 \
+            icon.drawing=off \
+            padding_left=5 \
+            padding_right=5 \
+            background.drawing=off \
+            click_script="/Users/skril/.config/aerospace/scripts/history.sh clear"
+done
+
+sketchybar --add item history_controller right \
+    --subscribe history_controller aerospace_workspace_change aerospace_history_change \
+    --set history_controller \
+        drawing=off \
+        updates=on \
+        script="$PLUGIN_DIR/history.sh"
 
 # ----- OVERVIEW POPUP ANCHOR (hidden, triggered by BTT) -----
 sketchybar --add item overview_anchor center \
