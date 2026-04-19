@@ -11,13 +11,14 @@ sketchybar --bar \
     blur_radius=20 \
     position=top \
     padding_left=12 \
-    padding_right=16 \
+    padding_right=40 \
     color=0x881d1d20 \
     corner_radius=8 \
     y_offset=4 \
     margin=0 \
     notch_width=250 \
-    topmost=off
+    topmost=off \
+    display=all
 
 # ----- DEFAULTS -----
 sketchybar --default \
@@ -39,10 +40,14 @@ sketchybar --add event aerospace_history_change
 for sid in 1 2 3 4 5 6 7 8 9 10; do
     # Workspace 10 is labeled "0" to match its keyboard binding (alt-ctrl-cmd-0).
     [ "$sid" = "10" ] && sid_label="0" || sid_label="$sid"
+    # Workspaces 1–9 stay on display 1; workspace 10 starts on display 1 and
+    # gets reassigned by displays.sh when a secondary monitor is attached.
+    ws_display=1
     # Workspace number (drives the script that updates this workspace's state)
     sketchybar --add item space.$sid left \
         --subscribe space.$sid aerospace_workspace_change \
         --set space.$sid \
+            display=$ws_display \
             icon="$sid_label" \
             icon.padding_left=10 \
             icon.padding_right=6 \
@@ -56,6 +61,7 @@ for sid in 1 2 3 4 5 6 7 8 9 10; do
     for slot in 0 1; do
         sketchybar --add item space.$sid.s$slot left \
             --set space.$sid.s$slot \
+                display=$ws_display \
                 width=16 \
                 icon.drawing=off \
                 label="" \
@@ -70,6 +76,7 @@ for sid in 1 2 3 4 5 6 7 8 9 10; do
     # Right-side padding inside the pill (matches left icon.padding_left)
     sketchybar --add item space.$sid.pad left \
         --set space.$sid.pad \
+            display=$ws_display \
             width=4 \
             icon.drawing=off \
             label.drawing=off \
@@ -89,6 +96,7 @@ for sid in 1 2 3 4 5 6 7 8 9 10; do
     if [ "$sid" != "10" ]; then
         sketchybar --add item space.sep.$sid left \
             --set space.sep.$sid \
+                display=1 \
                 icon="▎" \
                 icon.color=0xff606060 \
                 icon.font="FiraCode Nerd Font:Bold:18.0" \
@@ -99,6 +107,17 @@ for sid in 1 2 3 4 5 6 7 8 9 10; do
                 padding_right=3
     fi
 done
+
+# ----- DISPLAYS CONTROLLER -----
+# Reassigns workspace 10's pill to display 2 when an external monitor is
+# attached, back to display 1 when running solo. Re-evaluates on display
+# changes, on workspace changes (cheap safety net), and after wake.
+sketchybar --add item displays_controller right \
+    --subscribe displays_controller display_change aerospace_workspace_change system_woke \
+    --set displays_controller \
+        drawing=off \
+        updates=on \
+        script="$PLUGIN_DIR/displays.sh"
 
 # ----- RIGHT: order L→R after setup: keyboard | battery | clock -----
 # First-added = rightmost; last-added = leftmost
@@ -185,6 +204,9 @@ sketchybar --add item overview_anchor center \
 # Force initial workspace highlight
 sketchybar --trigger aerospace_workspace_change \
     FOCUSED_WORKSPACE=$(aerospace list-workspaces --focused)
+
+# Place workspace 10's pill on the right display before the bar paints
+"$PLUGIN_DIR/displays.sh"
 
 sketchybar --update
 
